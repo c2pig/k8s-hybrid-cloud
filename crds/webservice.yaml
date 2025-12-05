@@ -1,0 +1,197 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: webservices.platform.xyz.com
+spec:
+  group: platform.xyz.com
+  names:
+    kind: Webservice
+    listKind: WebserviceList
+    plural: webservices
+    singular: webservice
+    shortNames:
+      - ws
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - image
+                - port
+              properties:
+                image:
+                  type: string
+                  description: Container image to deploy
+                port:
+                  type: integer
+                  description: Port the service listens on
+                  minimum: 1
+                  maximum: 65535
+                replicas:
+                  type: object
+                  properties:
+                    min:
+                      type: integer
+                      default: 2
+                      minimum: 1
+                    max:
+                      type: integer
+                      default: 10
+                      minimum: 1
+                resources:
+                  type: object
+                  properties:
+                    cpu:
+                      type: string
+                      default: "500m"
+                    memory:
+                      type: string
+                      default: "512Mi"
+                    ephemeralStorage:
+                      type: string
+                      default: "1Gi"
+                autoscaling:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    targetCPU:
+                      type: integer
+                      default: 70
+                      minimum: 1
+                      maximum: 100
+                    targetMemory:
+                      type: integer
+                      minimum: 1
+                      maximum: 100
+                healthCheck:
+                  type: object
+                  properties:
+                    path:
+                      type: string
+                      default: "/health"
+                    port:
+                      type: integer
+                    initialDelaySeconds:
+                      type: integer
+                      default: 10
+                    periodSeconds:
+                      type: integer
+                      default: 10
+                env:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        properties:
+                          secretKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                          configMapKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                routing:
+                  type: object
+                  properties:
+                    public:
+                      type: boolean
+                      default: false
+                    domain:
+                      type: string
+                    path:
+                      type: string
+                    rateLimit:
+                      type: object
+                      properties:
+                        requestsPerSecond:
+                          type: integer
+                        burst:
+                          type: integer
+                highAvailability:
+                  type: boolean
+                  default: true
+                  description: Enable PDB and topology spread
+                cpuArchitecture:
+                  type: string
+                  enum:
+                    - amd64
+                    - arm64
+                  default: amd64
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Deploying
+                    - Running
+                    - Failed
+                    - Terminating
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                availableReplicas:
+                  type: integer
+                readyReplicas:
+                  type: integer
+                currentImage:
+                  type: string
+                endpoint:
+                  type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Image
+          type: string
+          jsonPath: .spec.image
+        - name: Port
+          type: integer
+          jsonPath: .spec.port
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Ready
+          type: string
+          jsonPath: .status.readyReplicas
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

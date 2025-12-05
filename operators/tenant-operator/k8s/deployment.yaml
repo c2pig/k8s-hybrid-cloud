@@ -1,0 +1,126 @@
+# Tenant Operator Deployment
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-system
+  labels:
+    platform.xyz.com/component: operators
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-operator
+  namespace: platform-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-operator
+rules:
+  # Manage Tenants
+  - apiGroups: ["platform.xyz.com"]
+    resources: ["tenants", "tenants/status"]
+    verbs: ["*"]
+  # Manage Namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["*"]
+  # Manage ResourceQuotas
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["*"]
+  # Manage LimitRanges
+  - apiGroups: [""]
+    resources: ["limitranges"]
+    verbs: ["*"]
+  # Manage NetworkPolicies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["*"]
+  # Manage RBAC
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["*"]
+  # Read Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenant-operator
+subjects:
+  - kind: ServiceAccount
+    name: tenant-operator
+    namespace: platform-system
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-operator
+  namespace: platform-system
+  labels:
+    app: tenant-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tenant-operator
+  template:
+    metadata:
+      labels:
+        app: tenant-operator
+    spec:
+      serviceAccountName: tenant-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+      containers:
+        - name: operator
+          image: xyz.azurecr.io/tenant-operator:v1.0.0
+          args:
+            - --leader-elect=true
+          ports:
+            - name: metrics
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+

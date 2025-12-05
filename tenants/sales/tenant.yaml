@@ -1,0 +1,25 @@
+# Sales Domain Tenant Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Tenant
+metadata:
+  name: sales
+spec:
+  owner: sales-team
+  costCenter: CC-SALES-001
+  quota:
+    cpu: "20"
+    memory: "40Gi"
+    pods: 100
+    pvcs: 20
+    services: 30
+  allowedIntegrations:
+    - hirer
+    - candidate
+    - marketing
+    - analytics
+  contacts:
+    slack: "#sales-platform"
+    email: sales-platform@xyz.com
+    pagerduty: sales-oncall
+

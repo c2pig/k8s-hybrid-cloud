@@ -1,0 +1,94 @@
+# AI Domain - AI Service CRDs
+---
+apiVersion: ai.xyz.com/v1alpha1
+kind: AIService
+metadata:
+  name: job-matching-model
+  namespace: ai
+  labels:
+    app: job-matching-model
+spec:
+  model:
+    name: job-matching-v2
+    version: "2.1.0"
+    registry: s3://xyz-models/job-matching/
+    framework: pytorch
+  serving:
+    framework: kserve
+    gpu: false  # CPU inference for cost savings
+    replicas: 2
+  api:
+    type: rest
+    rateLimit: 200/min
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  monitoring:
+    enabled: true
+    metrics:
+      - latency
+      - throughput
+      - errorRate
+
+---
+apiVersion: ai.xyz.com/v1alpha1
+kind: AIService
+metadata:
+  name: resume-parser
+  namespace: ai
+  labels:
+    app: resume-parser
+spec:
+  model:
+    name: resume-parser-v1
+    version: "1.3.0"
+    registry: s3://xyz-models/resume-parser/
+    framework: transformers
+  serving:
+    framework: kserve
+    gpu: false
+    replicas: 3
+  api:
+    type: rest
+    rateLimit: 100/min
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+---
+apiVersion: ai.xyz.com/v1alpha1
+kind: AIService
+metadata:
+  name: job-description-generator
+  namespace: ai
+  labels:
+    app: job-description-generator
+spec:
+  model:
+    name: jd-generator-v1
+    version: "1.0.0"
+    registry: s3://xyz-models/jd-generator/
+    framework: vllm
+  serving:
+    framework: vllm
+    gpu: true  # Requires GPU for LLM inference
+    replicas: 1
+  api:
+    type: openai-compatible
+    rateLimit: 50/min
+  resources:
+    requests:
+      cpu: "2"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "16Gi"
+      nvidia.com/gpu: "1"

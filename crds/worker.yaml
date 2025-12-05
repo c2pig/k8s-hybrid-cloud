@@ -1,0 +1,172 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: workers.platform.xyz.com
+spec:
+  group: platform.xyz.com
+  names:
+    kind: Worker
+    listKind: WorkerList
+    plural: workers
+    singular: worker
+    shortNames:
+      - wk
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  description: Container image for the worker
+                replicas:
+                  type: integer
+                  description: Number of worker replicas
+                  default: 1
+                  minimum: 1
+                  maximum: 50
+                resources:
+                  type: object
+                  properties:
+                    cpu:
+                      type: string
+                      default: "500m"
+                    memory:
+                      type: string
+                      default: "512Mi"
+                queue:
+                  type: object
+                  description: Queue configuration for the worker
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - sqs
+                        - rabbitmq
+                        - kafka
+                        - redis
+                      description: Queue type
+                    name:
+                      type: string
+                      description: Queue name
+                    url:
+                      type: string
+                      description: Queue URL/connection string
+                    concurrency:
+                      type: integer
+                      default: 10
+                      description: Number of concurrent jobs per worker
+                scaling:
+                  type: object
+                  description: Auto-scaling configuration
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    metric:
+                      type: string
+                      enum:
+                        - queueLength
+                        - cpu
+                        - memory
+                        - custom
+                      default: queueLength
+                    threshold:
+                      type: integer
+                      default: 100
+                      description: Threshold for scaling up
+                    minReplicas:
+                      type: integer
+                      default: 1
+                    maxReplicas:
+                      type: integer
+                      default: 20
+                env:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        properties:
+                          secretKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                gracefulShutdown:
+                  type: object
+                  properties:
+                    timeout:
+                      type: string
+                      default: "30s"
+                      description: Time to wait for graceful shutdown
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Running
+                    - Scaling
+                    - Failed
+                    - Terminating
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                activeReplicas:
+                  type: integer
+                processingJobs:
+                  type: integer
+                queueDepth:
+                  type: integer
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Image
+          type: string
+          jsonPath: .spec.image
+        - name: Replicas
+          type: integer
+          jsonPath: .spec.replicas
+        - name: Queue
+          type: string
+          jsonPath: .spec.queue.type
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

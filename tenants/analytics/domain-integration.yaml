@@ -1,0 +1,38 @@
+# Analytics Domain Integrations
+# Connect to data-service for warehouse access
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: DomainIntegration
+metadata:
+  name: data-service-connection
+  namespace: analytics
+spec:
+  targetDomain: data-service
+  targetService: warehouse-api
+  permissions:
+    - read:analytics-data
+    - read:reports
+  config:
+    timeout: 30000
+    retries: 3
+    circuitBreaker:
+      enabled: true
+      threshold: 5
+
+---
+# Connect to AI domain for ML predictions
+apiVersion: platform.xyz.com/v1alpha1
+kind: DomainIntegration
+metadata:
+  name: ai-predictions-connection
+  namespace: analytics
+spec:
+  targetDomain: ai
+  targetService: prediction-api
+  permissions:
+    - read:predictions
+    - invoke:batch-predict
+  config:
+    timeout: 60000
+    retries: 2
+

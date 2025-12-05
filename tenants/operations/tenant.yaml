@@ -1,0 +1,28 @@
+# Operations Domain Tenant Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Tenant
+metadata:
+  name: operations
+spec:
+  owner: operations-team
+  costCenter: CC-OPS-001
+  quota:
+    cpu: "10"
+    memory: "20Gi"
+    pods: 50
+    pvcs: 10
+    services: 20
+  allowedIntegrations:
+    - candidate
+    - hirer
+    - sales
+    - marketing
+    - data-service
+    - ai
+    - analytics
+  contacts:
+    slack: "#ops-platform"
+    email: ops-platform@xyz.com
+    pagerduty: ops-oncall
+

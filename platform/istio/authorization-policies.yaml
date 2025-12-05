@@ -1,0 +1,241 @@
+# Istio Authorization Policies
+# Default deny + explicit allow patterns for zero-trust networking
+
+---
+# Default deny all traffic in the mesh (except system namespaces)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: istio-system
+spec:
+  # Empty spec = deny all
+  {}
+
+---
+# Allow traffic from ingress gateway to all namespaces
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-ingress-gateway
+  namespace: istio-system
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account
+
+---
+# Allow Prometheus to scrape metrics from all pods
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-prometheus
+  namespace: istio-system
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - monitoring
+              - prometheus
+      to:
+        - operation:
+            ports:
+              - "15020"  # Istio metrics
+              - "15090"  # Envoy metrics
+
+---
+# Template: Allow same-namespace traffic
+# Apply this to each tenant namespace
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: candidate
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - candidate
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: hirer
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - hirer
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: sales
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - sales
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: marketing
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - marketing
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: operations
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - operations
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: data-service
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - data-service
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: ai
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - ai
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: analytics
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - analytics
+
+---
+# Cross-domain integration examples
+# These would be created by the DomainIntegration operator
+
+# Allow hirer to call candidate API (for job matching)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-hirer-to-candidate
+  namespace: candidate
+spec:
+  selector:
+    matchLabels:
+      app: candidate-api
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - hirer
+      to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/v1/candidates/*
+              - /api/v1/profiles/*
+
+# Allow AI to read from data-service
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-ai-to-data
+  namespace: data-service
+spec:
+  selector:
+    matchLabels:
+      app: datalake-api
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - ai
+      to:
+        - operation:
+            methods:
+              - GET
+              - POST
+            paths:
+              - /api/v1/features/*
+              - /api/v1/datasets/*
+
+# Allow analytics to read from data-service
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-analytics-to-data
+  namespace: data-service
+spec:
+  selector:
+    matchLabels:
+      app: warehouse-api
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - analytics
+      to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/v1/query
+              - /api/v1/reports/*
+

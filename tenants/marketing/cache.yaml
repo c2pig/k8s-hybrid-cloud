@@ -1,0 +1,78 @@
+# Marketing Domain - Redis Cache
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Cache
+metadata:
+  name: campaign-cache
+  namespace: marketing
+spec:
+  type: redis
+  version: "7"
+  size: small
+  persistence: false
+  storage: 1Gi
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campaign-cache
+  namespace: marketing
+  labels:
+    app: campaign-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: campaign-cache
+  template:
+    metadata:
+      labels:
+        app: campaign-cache
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: campaign-cache
+  namespace: marketing
+spec:
+  selector:
+    app: campaign-cache
+  ports:
+    - port: 6379
+      targetPort: 6379
+

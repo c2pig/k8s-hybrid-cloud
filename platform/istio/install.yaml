@@ -1,0 +1,155 @@
+# Istio Installation Configuration
+# 
+# Install with: istioctl install -f platform/istio/install.yaml
+#
+# This uses the "minimal" profile suitable for laptop/dev environments
+# For production, consider "default" or "demo" profiles
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: xyz-platform-istio
+  namespace: istio-system
+spec:
+  profile: minimal
+  
+  # Global mesh configuration
+  meshConfig:
+    # Enable access logging
+    accessLogFile: /dev/stdout
+    accessLogFormat: |
+      {"timestamp":"%START_TIME%","request_id":"%REQ(X-REQUEST-ID)%","source_namespace":"%DOWNSTREAM_LOCAL_ADDRESS%","destination_namespace":"%UPSTREAM_HOST%","source":"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%","destination":"%UPSTREAM_CLUSTER%","duration":"%DURATION%","request_method":"%REQ(:METHOD)%","request_path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","response_code":"%RESPONSE_CODE%","response_flags":"%RESPONSE_FLAGS%","bytes_sent":"%BYTES_SENT%","bytes_received":"%BYTES_RECEIVED%","user_agent":"%REQ(USER-AGENT)%"}
+    
+    # Default to STRICT mTLS
+    defaultConfig:
+      holdApplicationUntilProxyStarts: true
+      proxyMetadata:
+        ISTIO_META_DNS_CAPTURE: "true"
+        ISTIO_META_DNS_AUTO_ALLOCATE: "true"
+    
+    # Enable tracing
+    enableTracing: true
+    defaultProviders:
+      tracing:
+        - stackdriver
+
+  # Component configurations
+  components:
+    # Pilot (istiod) configuration
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        hpaSpec:
+          minReplicas: 1
+          maxReplicas: 3
+        env:
+          - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
+            value: "true"
+          - name: PILOT_ENABLE_WORKLOAD_ENTRY_HEALTHCHECKS
+            value: "true"
+
+    # Ingress Gateway
+    ingressGateways:
+      - name: istio-ingressgateway
+        enabled: true
+        k8s:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          service:
+            type: LoadBalancer
+            ports:
+              - port: 80
+                targetPort: 8080
+                name: http2
+              - port: 443
+                targetPort: 8443
+                name: https
+
+    # Egress Gateway (disabled for laptop, enable for production)
+    egressGateways:
+      - name: istio-egressgateway
+        enabled: false
+
+  # Values for Helm charts
+  values:
+    global:
+      # Proxy settings
+      proxy:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      
+      # Enable privileged init containers (needed for some CNIs)
+      proxy_init:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+          limits:
+            cpu: 100m
+            memory: 50Mi
+
+    # Pilot values
+    pilot:
+      autoscaleEnabled: true
+      autoscaleMin: 1
+      autoscaleMax: 3
+      traceSampling: 100.0
+
+---
+# PeerAuthentication: Enable STRICT mTLS mesh-wide
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Gateway for public traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: xyz-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*.xyz.local"
+        - "*.localhost"
+      tls:
+        httpsRedirect: false  # Set to true in production
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "*.xyz.local"
+        - "*.localhost"
+      tls:
+        mode: SIMPLE
+        credentialName: xyz-wildcard-cert  # Create this secret for TLS
+

@@ -1,0 +1,174 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: buckets.platform.xyz.com
+spec:
+  group: platform.xyz.com
+  names:
+    kind: Bucket
+    listKind: BucketList
+    plural: buckets
+    singular: bucket
+    shortNames:
+      - bkt
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  description: Cloud provider for the bucket
+                  enum:
+                    - aws
+                    - gcp
+                    - azure
+                    - minio
+                  default: aws
+                region:
+                  type: string
+                  description: Cloud region
+                  default: ap-southeast-2
+                versioning:
+                  type: boolean
+                  description: Enable object versioning
+                  default: false
+                encryption:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    type:
+                      type: string
+                      enum:
+                        - AES256
+                        - aws:kms
+                      default: AES256
+                    kmsKeyId:
+                      type: string
+                      description: KMS key ID (if using KMS encryption)
+                publicAccess:
+                  type: boolean
+                  description: Allow public access (not recommended)
+                  default: false
+                lifecycle:
+                  type: array
+                  description: Lifecycle rules for automatic cleanup
+                  items:
+                    type: object
+                    properties:
+                      prefix:
+                        type: string
+                        description: Object prefix to match
+                      expirationDays:
+                        type: integer
+                        description: Days until expiration
+                      transitionDays:
+                        type: integer
+                        description: Days until transition to different storage class
+                      transitionStorageClass:
+                        type: string
+                        enum:
+                          - GLACIER
+                          - DEEP_ARCHIVE
+                          - STANDARD_IA
+                cors:
+                  type: object
+                  description: CORS configuration
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    allowedOrigins:
+                      type: array
+                      items:
+                        type: string
+                    allowedMethods:
+                      type: array
+                      items:
+                        type: string
+                        enum:
+                          - GET
+                          - PUT
+                          - POST
+                          - DELETE
+                          - HEAD
+                replication:
+                  type: object
+                  description: Cross-region replication
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    destinationRegion:
+                      type: string
+                    destinationBucket:
+                      type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Creating
+                    - Ready
+                    - Failed
+                    - Deleting
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                bucketName:
+                  type: string
+                  description: Actual bucket name (may include prefix)
+                bucketArn:
+                  type: string
+                  description: ARN/URI of the bucket
+                endpoint:
+                  type: string
+                  description: Bucket endpoint URL
+                credentialsSecret:
+                  type: string
+                  description: Secret containing access credentials
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Provider
+          type: string
+          jsonPath: .spec.provider
+        - name: Region
+          type: string
+          jsonPath: .spec.region
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Bucket Name
+          type: string
+          jsonPath: .status.bucketName
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

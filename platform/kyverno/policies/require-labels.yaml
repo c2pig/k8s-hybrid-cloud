@@ -1,0 +1,121 @@
+# Kyverno Policies for XYZ Platform
+
+---
+# Require ownership labels on all namespaces
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-namespace-labels
+  annotations:
+    policies.kyverno.io/title: Require Namespace Labels
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      All namespaces must have ownership labels for cost allocation
+      and access control.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-owner-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kube-public
+                - kube-node-lease
+                - default
+                - istio-system
+                - argocd
+                - kyverno
+                - cnpg-system
+                - dex
+                - monitoring
+      validate:
+        message: "Namespace must have 'platform.xyz.com/owner' label"
+        pattern:
+          metadata:
+            labels:
+              platform.xyz.com/owner: "?*"
+
+---
+# Require labels on all deployments
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-deployment-labels
+  annotations:
+    policies.kyverno.io/title: Require Deployment Labels
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-app-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+                - argocd
+                - kyverno
+                - cnpg-system
+                - dex
+                - monitoring
+      validate:
+        message: "Deployment must have 'app' and 'version' labels"
+        pattern:
+          metadata:
+            labels:
+              app: "?*"
+          spec:
+            template:
+              metadata:
+                labels:
+                  app: "?*"
+
+---
+# Add default labels to pods (mutation policy)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: add-default-labels
+  annotations:
+    policies.kyverno.io/title: Add Default Labels
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/description: >-
+      Automatically add platform labels to pods
+spec:
+  background: false
+  rules:
+    - name: add-platform-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            labels:
+              +(platform.xyz.com/managed): "true"
+

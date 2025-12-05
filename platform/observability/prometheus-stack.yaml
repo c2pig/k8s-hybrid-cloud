@@ -1,0 +1,133 @@
+# Prometheus Stack Installation
+#
+# This installs Prometheus, Grafana, and Alertmanager
+# Using kube-prometheus-stack helm chart
+#
+# Install with:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f platform/observability/prometheus-stack.yaml
+
+# Minimal values for laptop POC
+# Increase resources for production
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 7d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    # Service discovery for Istio
+    additionalScrapeConfigs:
+      - job_name: 'istiod'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - istio-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: istiod;http-monitoring
+      - job_name: 'envoy-stats'
+        metrics_path: /stats/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: '.*-envoy-prom'
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+grafana:
+  replicas: 1
+  adminPassword: admin  # Change in production!
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  # Dex OAuth integration
+  grafana.ini:
+    server:
+      root_url: http://localhost:3000
+    auth.generic_oauth:
+      enabled: true
+      name: Platform SSO
+      allow_sign_up: true
+      client_id: grafana
+      client_secret: grafana-dex-secret
+      scopes: openid profile email groups
+      auth_url: http://dex.dex.svc.cluster.local:5556/auth
+      token_url: http://dex.dex.svc.cluster.local:5556/token
+      api_url: http://dex.dex.svc.cluster.local:5556/userinfo
+      role_attribute_path: contains(groups[*], 'platform-admins') && 'Admin' || 'Viewer'
+  
+  # Pre-installed dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'istio'
+          orgId: 1
+          folder: 'Istio'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/istio
+        - name: 'kubernetes'
+          orgId: 1
+          folder: 'Kubernetes'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/kubernetes
+
+# Node exporter for host metrics
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# kube-state-metrics for K8s object metrics
+kubeStateMetrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+

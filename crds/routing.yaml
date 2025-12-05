@@ -1,0 +1,168 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: routings.platform.xyz.com
+spec:
+  group: platform.xyz.com
+  names:
+    kind: Routing
+    listKind: RoutingList
+    plural: routings
+    singular: routing
+    shortNames:
+      - rt
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - service
+                - port
+              properties:
+                service:
+                  type: string
+                  description: Target service name
+                port:
+                  type: integer
+                  description: Target service port
+                  minimum: 1
+                  maximum: 65535
+                exposure:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - public
+                        - internal
+                        - private
+                      default: internal
+                    domain:
+                      type: string
+                      description: Custom domain (for public)
+                    path:
+                      type: string
+                      default: "/"
+                      description: URL path prefix
+                tls:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    issuer:
+                      type: string
+                      description: cert-manager issuer name
+                      default: "letsencrypt-prod"
+                    secretName:
+                      type: string
+                      description: Existing TLS secret name
+                rateLimit:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    requestsPerSecond:
+                      type: integer
+                      default: 100
+                    burst:
+                      type: integer
+                      default: 200
+                cors:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    allowOrigins:
+                      type: array
+                      items:
+                        type: string
+                    allowMethods:
+                      type: array
+                      items:
+                        type: string
+                    allowHeaders:
+                      type: array
+                      items:
+                        type: string
+                    maxAge:
+                      type: string
+                      default: "24h"
+                timeout:
+                  type: string
+                  description: Request timeout
+                  default: "30s"
+                retries:
+                  type: object
+                  properties:
+                    attempts:
+                      type: integer
+                      default: 3
+                    perTryTimeout:
+                      type: string
+                      default: "10s"
+                    retryOn:
+                      type: string
+                      default: "5xx,reset,connect-failure"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Active
+                    - Failed
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                endpoint:
+                  type: string
+                  description: Generated endpoint URL
+                virtualServiceName:
+                  type: string
+                gatewayName:
+                  type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Service
+          type: string
+          jsonPath: .spec.service
+        - name: Type
+          type: string
+          jsonPath: .spec.exposure.type
+        - name: Endpoint
+          type: string
+          jsonPath: .status.endpoint
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

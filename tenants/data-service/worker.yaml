@@ -1,0 +1,85 @@
+# Data Service Domain - Workers (ETL Pipelines)
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Worker
+metadata:
+  name: etl-pipeline-worker
+  namespace: data-service
+  labels:
+    app: etl-pipeline-worker
+spec:
+  image: nginx:1.25-alpine  # Placeholder
+  replicas: 3
+  resources:
+    cpu: "1"
+    memory: "2Gi"
+  queue:
+    type: kafka
+    name: etl-jobs
+    concurrency: 5
+  scaling:
+    enabled: true
+    metric: queueLength
+    threshold: 50
+    minReplicas: 2
+    maxReplicas: 10
+  gracefulShutdown:
+    timeout: "60s"
+
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Worker
+metadata:
+  name: data-sync-worker
+  namespace: data-service
+  labels:
+    app: data-sync-worker
+spec:
+  image: nginx:1.25-alpine
+  replicas: 2
+  resources:
+    cpu: "500m"
+    memory: "1Gi"
+  queue:
+    type: redis
+    name: sync-queue
+    concurrency: 10
+  scaling:
+    enabled: true
+    metric: queueLength
+    threshold: 100
+    minReplicas: 1
+    maxReplicas: 5
+
+---
+# Scheduled ETL Tasks
+apiVersion: platform.xyz.com/v1alpha1
+kind: ScheduledTask
+metadata:
+  name: nightly-aggregation
+  namespace: data-service
+spec:
+  schedule: "0 2 * * *"  # 2 AM daily
+  image: nginx:1.25-alpine
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  timeout: "4h"
+  retries: 2
+  concurrencyPolicy: Forbid
+
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: ScheduledTask
+metadata:
+  name: weekly-cleanup
+  namespace: data-service
+spec:
+  schedule: "0 3 * * 0"  # 3 AM on Sundays
+  image: nginx:1.25-alpine
+  resources:
+    cpu: "500m"
+    memory: "512Mi"
+  timeout: "2h"
+  retries: 1
+

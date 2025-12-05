@@ -1,0 +1,50 @@
+# Sales Domain - PostgreSQL Database
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Database
+metadata:
+  name: sales-db
+  namespace: sales
+  labels:
+    app: sales-db
+spec:
+  type: postgresql
+  version: "15"
+  size: medium
+  storage: 20Gi
+  backups:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention: 14d
+
+---
+# CloudNativePG Cluster (actual PostgreSQL deployment)
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: sales-db
+  namespace: sales
+spec:
+  instances: 1  # Single instance for dev/POC
+  
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+  
+  storage:
+    size: 10Gi
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  bootstrap:
+    initdb:
+      database: sales
+      owner: sales_user
+

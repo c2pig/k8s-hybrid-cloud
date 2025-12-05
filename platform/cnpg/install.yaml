@@ -1,0 +1,42 @@
+# CloudNativePG Installation
+#
+# CloudNativePG is the Kubernetes operator for PostgreSQL
+# It provides self-service database provisioning for tenants
+#
+# Install with:
+#   helm repo add cnpg https://cloudnative-pg.github.io/charts
+#   helm install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace -f platform/cnpg/install.yaml
+
+# Helm values for CloudNativePG
+replicaCount: 1  # Increase to 2+ for production
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Monitoring
+monitoring:
+  podMonitorEnabled: false  # Enable if Prometheus Operator is installed
+
+# Webhook configuration
+webhook:
+  port: 9443
+  mutating:
+    create: true
+  validating:
+    create: true
+
+# Config
+config:
+  create: true
+  name: cnpg-controller-manager-config
+  data:
+    # Inherited annotations for pods
+    INHERITED_ANNOTATIONS: ""
+    # Inherited labels for pods
+    INHERITED_LABELS: ""
+

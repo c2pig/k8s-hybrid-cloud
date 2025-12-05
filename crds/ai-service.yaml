@@ -1,0 +1,200 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: aiservices.ai.xyz.com
+spec:
+  group: ai.xyz.com
+  names:
+    kind: AIService
+    listKind: AIServiceList
+    plural: aiservices
+    singular: aiservice
+    shortNames:
+      - ais
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - model
+              properties:
+                model:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      description: Model name
+                    version:
+                      type: string
+                      description: Model version
+                    registry:
+                      type: string
+                      description: Model registry URL (S3, GCS, etc.)
+                    framework:
+                      type: string
+                      description: ML framework
+                      enum:
+                        - pytorch
+                        - tensorflow
+                        - onnx
+                        - huggingface
+                      default: pytorch
+                serving:
+                  type: object
+                  properties:
+                    framework:
+                      type: string
+                      description: Serving framework
+                      enum:
+                        - kserve
+                        - triton
+                        - vllm
+                        - ollama
+                      default: kserve
+                    replicas:
+                      type: integer
+                      default: 1
+                      minimum: 1
+                    gpu:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                        type:
+                          type: string
+                          description: GPU type
+                          enum:
+                            - nvidia-t4
+                            - nvidia-a10g
+                            - nvidia-a100
+                        count:
+                          type: integer
+                          default: 1
+                    resources:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: "2"
+                        memory:
+                          type: string
+                          default: "4Gi"
+                api:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      description: API type
+                      enum:
+                        - rest
+                        - grpc
+                        - openai-compatible
+                      default: rest
+                    rateLimit:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        requestsPerMinute:
+                          type: integer
+                          default: 100
+                    authentication:
+                      type: object
+                      properties:
+                        required:
+                          type: boolean
+                          default: true
+                        type:
+                          type: string
+                          enum:
+                            - apiKey
+                            - jwt
+                            - mtls
+                          default: apiKey
+                scaling:
+                  type: object
+                  properties:
+                    minReplicas:
+                      type: integer
+                      default: 1
+                    maxReplicas:
+                      type: integer
+                      default: 5
+                    targetConcurrency:
+                      type: integer
+                      default: 10
+                    scaleToZero:
+                      type: boolean
+                      default: false
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Loading
+                    - Ready
+                    - Failed
+                    - Scaling
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                endpoint:
+                  type: string
+                  description: Inference endpoint URL
+                modelLoaded:
+                  type: boolean
+                readyReplicas:
+                  type: integer
+                lastInferenceTime:
+                  type: string
+                  format: date-time
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Model
+          type: string
+          jsonPath: .spec.model.name
+        - name: Framework
+          type: string
+          jsonPath: .spec.serving.framework
+        - name: GPU
+          type: boolean
+          jsonPath: .spec.serving.gpu.enabled
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Endpoint
+          type: string
+          jsonPath: .status.endpoint
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

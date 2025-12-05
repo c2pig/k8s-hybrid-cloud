@@ -1,0 +1,115 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tenants.platform.xyz.com
+spec:
+  group: platform.xyz.com
+  names:
+    kind: Tenant
+    listKind: TenantList
+    plural: tenants
+    singular: tenant
+    shortNames:
+      - tn
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - owner
+              properties:
+                owner:
+                  type: string
+                  description: Team or individual owning this tenant
+                costCenter:
+                  type: string
+                  description: Cost center for billing
+                quota:
+                  type: object
+                  description: Resource quota for the tenant
+                  properties:
+                    cpu:
+                      type: string
+                      default: "10"
+                    memory:
+                      type: string
+                      default: "20Gi"
+                    pods:
+                      type: integer
+                      default: 100
+                    pvcs:
+                      type: integer
+                      default: 20
+                    services:
+                      type: integer
+                      default: 50
+                allowedIntegrations:
+                  type: array
+                  description: List of domains this tenant can integrate with
+                  items:
+                    type: string
+                contacts:
+                  type: object
+                  properties:
+                    slack:
+                      type: string
+                    email:
+                      type: string
+                    pagerduty:
+                      type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Active
+                    - Terminating
+                    - Failed
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                namespaceCreated:
+                  type: boolean
+                quotaApplied:
+                  type: boolean
+                networkPolicyApplied:
+                  type: boolean
+                rbacApplied:
+                  type: boolean
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Owner
+          type: string
+          jsonPath: .spec.owner
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

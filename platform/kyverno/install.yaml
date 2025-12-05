@@ -1,0 +1,51 @@
+# Kyverno Installation
+#
+# Install with: helm install kyverno kyverno/kyverno -n kyverno --create-namespace -f platform/kyverno/install.yaml
+#
+# Kyverno is chosen over OPA Gatekeeper for:
+# - Simpler policy syntax (YAML, not Rego)
+# - Mutation support out of the box
+# - Generate policies (auto-create resources)
+# - Better for smaller teams
+
+# Helm values for Kyverno installation
+replicaCount: 1  # Increase to 3 for production
+
+resources:
+  limits:
+    memory: 384Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Exclude system namespaces from policy enforcement
+config:
+  webhooks:
+    - namespaceSelector:
+        matchExpressions:
+          - key: kubernetes.io/metadata.name
+            operator: NotIn
+            values:
+              - kube-system
+              - kube-public
+              - kube-node-lease
+              - kyverno
+
+# Background scanning
+backgroundController:
+  enabled: true
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Cleanup controller for policy reports
+cleanupController:
+  enabled: true
+
+# Reports controller
+reportsController:
+  enabled: true
+

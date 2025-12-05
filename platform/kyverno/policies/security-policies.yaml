@@ -1,0 +1,348 @@
+# Kyverno Security Policies for XYZ Platform
+
+---
+# Restrict container registries
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict Image Registries
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Only allow images from trusted registries. This prevents supply chain
+      attacks by ensuring only approved container images are deployed.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-registries
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+                - argocd
+                - kyverno
+                - cnpg-system
+                - dex
+                - monitoring
+      validate:
+        message: "Images must be from allowed registries: xyz.azurecr.io, ghcr.io/xyz-company, docker.io/library, gcr.io/distroless"
+        foreach:
+          - list: "request.object.spec.[initContainers, containers][]"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ element.image }}"
+                    operator: NotIn
+                    value:
+                      - "xyz.azurecr.io/*"
+                      - "ghcr.io/xyz-company/*"
+                      - "docker.io/library/*"
+                      - "gcr.io/distroless/*"
+                      - "nginx:*"
+                      - "redis:*"
+                      - "postgres:*"
+
+---
+# Disallow privileged containers
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-containers
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers
+    policies.kyverno.io/category: Pod Security Standards
+    policies.kyverno.io/severity: critical
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: deny-privileged
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+      validate:
+        message: "Privileged containers are not allowed"
+        pattern:
+          spec:
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"
+
+---
+# Require non-root user
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-run-as-non-root
+  annotations:
+    policies.kyverno.io/title: Require Run As Non-Root
+    policies.kyverno.io/category: Pod Security Standards
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Audit  # Start with Audit, move to Enforce
+  background: true
+  rules:
+    - name: check-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+                - cnpg-system
+      validate:
+        message: "Containers must run as non-root user"
+        pattern:
+          spec:
+            =(securityContext):
+              =(runAsNonRoot): true
+
+---
+# Require resource limits
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+                - argocd
+                - kyverno
+                - cnpg-system
+                - dex
+                - monitoring
+      validate:
+        message: "Containers must have CPU and memory limits defined"
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: "?*"
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+
+---
+# Disallow latest tag
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Audit  # Start with Audit
+  background: true
+  rules:
+    - name: validate-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+      validate:
+        message: "Using 'latest' tag is not allowed. Please use a specific version."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+
+---
+# Require probes for long-running containers
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require Health Probes
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: validate-probes
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+                - kyverno
+      validate:
+        message: "Containers should have readinessProbe and livenessProbe defined"
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - readinessProbe:
+                      httpGet:
+                        path: "?*"
+                        port: "?*"
+                    livenessProbe:
+                      httpGet:
+                        path: "?*"
+                        port: "?*"
+
+---
+# Disallow host namespaces
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-namespaces
+  annotations:
+    policies.kyverno.io/title: Disallow Host Namespaces
+    policies.kyverno.io/category: Pod Security Standards
+    policies.kyverno.io/severity: critical
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: deny-host-namespaces
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+      validate:
+        message: "Host namespaces (hostPID, hostIPC, hostNetwork) are not allowed"
+        pattern:
+          spec:
+            =(hostPID): "false"
+            =(hostIPC): "false"
+            =(hostNetwork): "false"
+
+---
+# Block NodePort services
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-nodeport
+  annotations:
+    policies.kyverno.io/title: Disallow NodePort Services
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: deny-nodeport
+      match:
+        any:
+          - resources:
+              kinds:
+                - Service
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+      validate:
+        message: "NodePort services are not allowed. Use ClusterIP with Istio Gateway."
+        pattern:
+          spec:
+            type: "!NodePort"
+
+---
+# Add network policy to new namespaces
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: add-default-network-policy
+  annotations:
+    policies.kyverno.io/title: Add Default Network Policy
+    policies.kyverno.io/category: Security
+spec:
+  rules:
+    - name: add-deny-all-ingress
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+      exclude:
+        any:
+          - resources:
+              names:
+                - kube-system
+                - kube-public
+                - default
+                - istio-system
+                - argocd
+                - kyverno
+                - cnpg-system
+                - dex
+                - monitoring
+      generate:
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        name: default-deny-ingress
+        namespace: "{{request.object.metadata.name}}"
+        synchronize: true
+        data:
+          spec:
+            podSelector: {}
+            policyTypes:
+              - Ingress

@@ -1,0 +1,24 @@
+# Marketing Domain Tenant Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Tenant
+metadata:
+  name: marketing
+spec:
+  owner: marketing-team
+  costCenter: CC-MKT-001
+  quota:
+    cpu: "15"
+    memory: "30Gi"
+    pods: 80
+    pvcs: 15
+    services: 25
+  allowedIntegrations:
+    - candidate
+    - hirer
+    - analytics
+    - data-service
+  contacts:
+    slack: "#marketing-platform"
+    email: marketing-platform@xyz.com
+

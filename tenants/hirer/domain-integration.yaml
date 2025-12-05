@@ -1,0 +1,68 @@
+# Hirer to Candidate Domain Integration
+# This allows hirer services to call candidate services
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: DomainIntegration
+metadata:
+  name: hirer-to-candidate
+  namespace: hirer
+spec:
+  targetDomain: candidate
+  targetService: candidate-api
+  targetPort: 80
+  permissions:
+    - read:candidates
+    - read:profiles
+  config:
+    timeout: "5s"
+    retries: 3
+    circuitBreaker:
+      enabled: true
+      maxConnections: 100
+      maxPendingRequests: 100
+  authentication:
+    type: mtls
+
+---
+# Istio AuthorizationPolicy to allow this integration
+# This would be created by the DomainIntegration operator
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-hirer-to-candidate-api
+  namespace: candidate
+spec:
+  selector:
+    matchLabels:
+      app: candidate-api
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - hirer
+      to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/v1/candidates/*
+              - /api/v1/profiles/*
+
+---
+# ServiceEntry for cross-namespace service discovery (optional)
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: candidate-api-entry
+  namespace: hirer
+spec:
+  hosts:
+    - candidate-api.candidate.svc.cluster.local
+  ports:
+    - number: 80
+      name: http
+      protocol: HTTP
+  resolution: DNS
+  location: MESH_INTERNAL
+

@@ -1,0 +1,48 @@
+# Candidate Domain - Storage Resources
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Bucket
+metadata:
+  name: resume-uploads
+  namespace: candidate
+spec:
+  provider: minio
+  region: ap-southeast-2
+  versioning: true
+  encryption:
+    enabled: true
+    type: AES256
+  publicAccess: false
+  lifecycle:
+    - prefix: temp/
+      expirationDays: 1
+    - prefix: processed/
+      expirationDays: 365
+  cors:
+    enabled: true
+    allowedOrigins:
+      - "https://candidate.xyz.local"
+      - "https://app.xyz.com"
+    allowedMethods:
+      - GET
+      - PUT
+      - POST
+      - DELETE
+
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Bucket
+metadata:
+  name: profile-images
+  namespace: candidate
+spec:
+  provider: minio
+  region: ap-southeast-2
+  versioning: false
+  encryption:
+    enabled: true
+    type: AES256
+  lifecycle:
+    - prefix: thumbnails/
+      expirationDays: 30
+

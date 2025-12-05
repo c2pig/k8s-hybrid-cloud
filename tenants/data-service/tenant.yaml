@@ -1,0 +1,27 @@
+# Data Service Domain Tenant Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Tenant
+metadata:
+  name: data-service
+spec:
+  owner: data-team
+  costCenter: CC-DATA-001
+  quota:
+    cpu: "50"
+    memory: "100Gi"
+    pods: 200
+    pvcs: 50
+    services: 50
+  allowedIntegrations:
+    - candidate
+    - hirer
+    - sales
+    - marketing
+    - ai
+    - analytics
+  contacts:
+    slack: "#data-platform"
+    email: data-platform@xyz.com
+    pagerduty: data-oncall
+

@@ -1,0 +1,29 @@
+# Analytics Tenant Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Tenant
+metadata:
+  name: analytics
+  labels:
+    platform.xyz.com/domain: analytics
+spec:
+  owner: analytics-team
+  costCenter: CC-ANALYTICS
+  quota:
+    cpu: "20"
+    memory: "40Gi"
+    pods: 100
+    pvcs: 30
+    services: 30
+  allowedIntegrations:
+    - data-service
+    - ai
+    - candidate
+    - hirer
+    - sales
+    - marketing
+  contacts:
+    slack: "#analytics-platform"
+    email: "analytics-team@xyz.com"
+    pagerduty: "analytics-oncall"
+

@@ -1,0 +1,96 @@
+# Hirer Cache Configuration (Redis)
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Cache
+metadata:
+  name: hirer-cache
+  namespace: hirer
+  labels:
+    app: hirer-cache
+spec:
+  type: redis
+  version: "7"
+  size: small
+  persistence: false
+  maxMemory: "256mb"
+  evictionPolicy: allkeys-lru
+
+---
+# Redis Deployment (simple single-instance for POC)
+# For production, use Redis Operator or Spotahome Redis Operator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hirer-cache
+  namespace: hirer
+  labels:
+    app: hirer-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hirer-cache
+  template:
+    metadata:
+      labels:
+        app: hirer-cache
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args:
+            - redis-server
+            - --maxmemory
+            - "256mb"
+            - --maxmemory-policy
+            - allkeys-lru
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "300Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hirer-cache
+  namespace: hirer
+  labels:
+    app: hirer-cache
+spec:
+  selector:
+    app: hirer-cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+

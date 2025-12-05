@@ -1,0 +1,105 @@
+# Sales CRM API
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Webservice
+metadata:
+  name: crm-api
+  namespace: sales
+  labels:
+    app: crm-api
+    version: v1
+spec:
+  image: nginx:1.25-alpine  # Placeholder
+  port: 80
+  replicas:
+    min: 2
+    max: 8
+  resources:
+    cpu: "500m"
+    memory: "512Mi"
+  autoscaling:
+    enabled: true
+    targetCPU: 70
+  healthCheck:
+    path: /health
+    port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 15
+  routing:
+    public: false  # Internal only
+    domain: crm.sales.svc.cluster.local
+    path: /api/v1
+  highAvailability: true
+
+---
+# Manual Deployment (until operator is built)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crm-api
+  namespace: sales
+  labels:
+    app: crm-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: crm-api
+  template:
+    metadata:
+      labels:
+        app: crm-api
+        version: v1
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crm-api
+  namespace: sales
+  labels:
+    app: crm-api
+spec:
+  selector:
+    app: crm-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+

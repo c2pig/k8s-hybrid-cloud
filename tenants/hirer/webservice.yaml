@@ -1,0 +1,136 @@
+# Hirer API Webservice
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Webservice
+metadata:
+  name: hirer-api
+  namespace: hirer
+  labels:
+    app: hirer-api
+    version: v1
+spec:
+  image: nginx:1.25-alpine
+  port: 80
+  replicas:
+    min: 2
+    max: 5
+  resources:
+    cpu: "250m"
+    memory: "256Mi"
+  autoscaling:
+    enabled: true
+    targetCPU: 70
+  healthCheck:
+    path: /
+    port: 80
+  routing:
+    public: true
+    domain: hirer.xyz.local
+    path: /api/v1
+  highAvailability: true
+
+---
+# Manual Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hirer-api
+  namespace: hirer
+  labels:
+    app: hirer-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hirer-api
+  template:
+    metadata:
+      labels:
+        app: hirer-api
+        version: v1
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hirer-api
+  namespace: hirer
+  labels:
+    app: hirer-api
+spec:
+  selector:
+    app: hirer-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hirer-api
+  namespace: hirer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hirer-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hirer-api
+  namespace: hirer
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hirer-api
+

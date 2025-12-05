@@ -1,0 +1,276 @@
+# Dex Installation and Configuration
+# 
+# Dex provides OIDC authentication with mock users for local development
+# In production, replace staticPasswords with Okta/Azure AD connector
+#
+# Install with:
+#   kubectl create namespace dex
+#   kubectl apply -f platform/dex/
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dex
+  labels:
+    platform.xyz.com/component: identity
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dex-config
+  namespace: dex
+data:
+  config.yaml: |
+    issuer: http://dex.dex.svc.cluster.local:5556
+    
+    storage:
+      type: kubernetes
+      config:
+        inCluster: true
+    
+    web:
+      http: 0.0.0.0:5556
+    
+    # OAuth2 settings
+    oauth2:
+      skipApprovalScreen: true
+    
+    # Expiry settings
+    expiry:
+      deviceRequests: "5m"
+      signingKeys: "6h"
+      idTokens: "24h"
+    
+    # Enable password database for static users
+    enablePasswordDB: true
+    
+    # ════════════════════════════════════════════════════════════════
+    # STATIC/MOCK USERS
+    # Replace with Okta/Azure AD connector for production
+    # ════════════════════════════════════════════════════════════════
+    staticPasswords:
+      # Platform Admin
+      - email: "admin@xyz.local"
+        # Password: admin123
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "admin"
+        userID: "admin-001"
+      
+      # Candidate Domain - Developer
+      - email: "john.doe@xyz.local"
+        # Password: password123
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "john.doe"
+        userID: "user-001"
+      
+      # Hirer Domain - Developer
+      - email: "jane.smith@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "jane.smith"
+        userID: "user-002"
+      
+      # Sales Domain - Developer
+      - email: "mike.sales@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "mike.sales"
+        userID: "user-003"
+      
+      # Marketing Domain - Developer
+      - email: "sarah.marketing@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "sarah.marketing"
+        userID: "user-004"
+      
+      # Operations Domain - Developer
+      - email: "ops.user@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "ops.user"
+        userID: "user-005"
+      
+      # Data Service Domain - Developer
+      - email: "data.engineer@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "data.engineer"
+        userID: "user-006"
+      
+      # AI Domain - Developer
+      - email: "bob.ml@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "bob.ml"
+        userID: "user-007"
+      
+      # Analytics Domain - Developer
+      - email: "analyst@xyz.local"
+        hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+        username: "analyst"
+        userID: "user-008"
+    
+    # ════════════════════════════════════════════════════════════════
+    # STATIC CLIENTS (Applications that use Dex for auth)
+    # ════════════════════════════════════════════════════════════════
+    staticClients:
+      # ArgoCD
+      - id: argocd
+        name: ArgoCD
+        secret: argocd-dex-secret
+        redirectURIs:
+          - https://argocd.localhost/auth/callback
+          - https://localhost:8080/auth/callback
+          - http://localhost:8080/auth/callback
+      
+      # Backstage
+      - id: backstage
+        name: Backstage Developer Portal
+        secret: backstage-dex-secret
+        redirectURIs:
+          - http://localhost:7007/api/auth/dex/handler/frame
+          - http://backstage.localhost:7007/api/auth/dex/handler/frame
+      
+      # Grafana
+      - id: grafana
+        name: Grafana
+        secret: grafana-dex-secret
+        redirectURIs:
+          - http://localhost:3000/login/generic_oauth
+          - http://grafana.localhost/login/generic_oauth
+      
+      # Kubernetes API (optional)
+      - id: kubernetes
+        name: Kubernetes
+        secret: kubernetes-dex-secret
+        redirectURIs:
+          - http://localhost:8000
+          - http://localhost:18000
+        trustedPeers:
+          - argocd
+    
+    # ════════════════════════════════════════════════════════════════
+    # CONNECTORS (Add Okta/Azure AD here for production)
+    # ════════════════════════════════════════════════════════════════
+    connectors: []
+    
+    # Example Okta connector (uncomment for production):
+    # connectors:
+    #   - type: oidc
+    #     id: okta
+    #     name: Okta
+    #     config:
+    #       issuer: https://xyz.okta.com
+    #       clientID: ${OKTA_CLIENT_ID}
+    #       clientSecret: ${OKTA_CLIENT_SECRET}
+    #       redirectURI: http://dex.xyz.com/callback
+    #       scopes:
+    #         - openid
+    #         - profile
+    #         - email
+    #         - groups
+    #       insecureSkipEmailVerified: true
+    #       getUserInfo: true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  namespace: dex
+  labels:
+    app: dex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dex
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      serviceAccountName: dex
+      containers:
+        - name: dex
+          image: ghcr.io/dexidp/dex:v2.37.0
+          command:
+            - /usr/local/bin/dex
+            - serve
+            - /etc/dex/config.yaml
+          ports:
+            - name: http
+              containerPort: 5556
+          volumeMounts:
+            - name: config
+              mountPath: /etc/dex
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5556
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5556
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: config
+          configMap:
+            name: dex-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: dex
+spec:
+  selector:
+    app: dex
+  ports:
+    - name: http
+      port: 5556
+      targetPort: 5556
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dex
+  namespace: dex
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dex
+rules:
+  - apiGroups: ["dex.coreos.com"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dex
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dex
+subjects:
+  - kind: ServiceAccount
+    name: dex
+    namespace: dex
+

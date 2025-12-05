@@ -1,0 +1,79 @@
+# Candidate Domain Routing Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Routing
+metadata:
+  name: candidate-api-public
+  namespace: candidate
+spec:
+  service: candidate-api
+  port: 80
+  exposure:
+    type: public
+    domain: candidate.xyz.local
+    path: /api/v1
+  tls:
+    enabled: false  # Enable in production
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 100
+    burst: 200
+  timeout: "30s"
+  retries:
+    attempts: 3
+    perTryTimeout: "10s"
+
+---
+# Istio VirtualService for routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: candidate-api
+  namespace: candidate
+spec:
+  hosts:
+    - candidate.xyz.local
+    - candidate-api.candidate.svc.cluster.local
+  gateways:
+    - istio-system/xyz-gateway
+    - mesh
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1
+      route:
+        - destination:
+            host: candidate-api.candidate.svc.cluster.local
+            port:
+              number: 80
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,reset,connect-failure
+
+---
+# Istio DestinationRule for traffic policy
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: candidate-api
+  namespace: candidate
+spec:
+  host: candidate-api.candidate.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        h2UpgradePolicy: UPGRADE
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+

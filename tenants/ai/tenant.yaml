@@ -1,0 +1,113 @@
+# AI Domain Tenant Configuration
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Tenant
+metadata:
+  name: ai
+spec:
+  owner: ai-team
+  costCenter: CC-AI-001
+  quota:
+    cpu: "40"
+    memory: "80Gi"
+    pods: 50
+    pvcs: 30
+    services: 20
+  allowedIntegrations:
+    - candidate
+    - hirer
+    - data-service
+  contacts:
+    slack: "#ai-platform"
+    email: ai-team@xyz.com
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai
+  labels:
+    platform.xyz.com/owner: ai-team
+    platform.xyz.com/tenant: ai
+    platform.xyz.com/cost-center: CC-AI-001
+    istio-injection: enabled
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: ai
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+    pods: "50"
+    persistentvolumeclaims: "30"
+    services: "20"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: ai
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1"
+        memory: "2Gi"
+      defaultRequest:
+        cpu: "200m"
+        memory: "512Mi"
+      max:
+        cpu: "8"
+        memory: "16Gi"
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-istio
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+

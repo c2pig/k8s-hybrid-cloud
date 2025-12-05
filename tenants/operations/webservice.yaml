@@ -1,0 +1,87 @@
+# Operations Admin Portal
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Webservice
+metadata:
+  name: admin-portal
+  namespace: operations
+  labels:
+    app: admin-portal
+    version: v1
+spec:
+  image: nginx:1.25-alpine  # Placeholder
+  port: 80
+  replicas:
+    min: 1
+    max: 3
+  resources:
+    cpu: "250m"
+    memory: "256Mi"
+  healthCheck:
+    path: /
+    port: 80
+  routing:
+    public: false  # Internal only
+    domain: admin.operations.svc.cluster.local
+  highAvailability: false  # Lower priority
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-portal
+  namespace: operations
+  labels:
+    app: admin-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-portal
+  template:
+    metadata:
+      labels:
+        app: admin-portal
+        version: v1
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: portal
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-portal
+  namespace: operations
+spec:
+  selector:
+    app: admin-portal
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+

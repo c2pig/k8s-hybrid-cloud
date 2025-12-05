@@ -1,0 +1,53 @@
+# Kiali Installation
+#
+# Kiali provides service mesh visualization for Istio
+#
+# Install with:
+#   helm repo add kiali https://kiali.org/helm-charts
+#   helm install kiali kiali/kiali-server -n istio-system -f platform/observability/kiali.yaml
+
+# Server configuration
+auth:
+  strategy: anonymous  # Use "openid" for SSO in production
+
+deployment:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# External services
+external_services:
+  prometheus:
+    url: http://prometheus-kube-prometheus-prometheus.monitoring:9090
+  
+  grafana:
+    enabled: true
+    in_cluster_url: http://prometheus-grafana.monitoring:80
+    url: http://localhost:3000
+  
+  tracing:
+    enabled: false  # Enable if Jaeger is installed
+    # in_cluster_url: http://jaeger-query.tracing:16685
+    # url: http://localhost:16686
+
+# Server settings
+server:
+  port: 20001
+  web_root: /kiali
+
+# Istio namespace
+istio_namespace: istio-system
+
+# Kiali feature flags
+kiali_feature_flags:
+  clustering:
+    enabled: false  # Enable for multi-cluster
+  validations:
+    ignore:
+      - "KIA1301"  # Ignore some validation warnings
+

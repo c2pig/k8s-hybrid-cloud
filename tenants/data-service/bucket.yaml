@@ -1,0 +1,62 @@
+# Data Service Domain - Storage Resources
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Bucket
+metadata:
+  name: data-lake-raw
+  namespace: data-service
+spec:
+  provider: minio  # Use MinIO for local development
+  region: ap-southeast-2
+  versioning: true
+  encryption:
+    enabled: true
+    type: AES256
+  lifecycle:
+    - prefix: temp/
+      expirationDays: 7
+    - prefix: staging/
+      expirationDays: 30
+    - prefix: archive/
+      transitionDays: 90
+      transitionStorageClass: GLACIER
+
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Bucket
+metadata:
+  name: data-lake-processed
+  namespace: data-service
+spec:
+  provider: minio
+  region: ap-southeast-2
+  versioning: true
+  encryption:
+    enabled: true
+    type: AES256
+  lifecycle:
+    - prefix: temp/
+      expirationDays: 14
+
+---
+apiVersion: platform.xyz.com/v1alpha1
+kind: Bucket
+metadata:
+  name: analytics-exports
+  namespace: data-service
+spec:
+  provider: minio
+  region: ap-southeast-2
+  versioning: false
+  encryption:
+    enabled: true
+    type: AES256
+  cors:
+    enabled: true
+    allowedOrigins:
+      - "https://analytics.xyz.local"
+      - "https://backstage.xyz.local"
+    allowedMethods:
+      - GET
+      - HEAD
+
